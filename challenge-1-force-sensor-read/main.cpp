@@ -1,10 +1,13 @@
 /********************************************************************
 
 Challenge 1 - Force/Torque sensor read
-Modern C++ study grouṕ  at AeroTech Lab, School of Engineering of São Carlos - University of São Paulo - Brazil
 
-Author: Maíra Canal 
-Date: 01/2021
+* @file main.cpp
+* @brief Exercise for the modern C++ study group at AeroTech Lab, School of 
+Engineering of São Carlos - University of São Paulo - Brazil
+* @author Autor: Maíra Canal (@mairacanal)
+* @date Jan 2021
+* @version 0.1
 
 ********************************************************************/
 
@@ -17,6 +20,9 @@ Date: 01/2021
 #define READ_AXIS_PACKAGE_SIZE 1
 #define CALIBRATION_MATRIX_SIZE 6
 
+/* Data structure defined to convert 4-bytes floating point 
+in hexadecimal format to a 4-bytes floating point in decimal
+format*/
 union ulf {
     unsigned long ul;
     float f;
@@ -29,14 +35,21 @@ class CANresponse {
         int payloadSize;
         std::vector<std::string> bytes;
 
-        void get_data(std::string line) {
+        /*
+         * @brief Defines all proprieties of the CANresponse class
+         * @param Actual reading line
+         */
+        void get_data(const std::string line) {
 
             get_messageID(line);
             get_payload(line);
             get_bytes(line);
 
         }
-
+        /*
+         * @brief Defines the messageID propriety of the CANresponse class
+         * @param Actual reading line
+         */
         void get_messageID(std::string line) {
 
             std::string newMessageId{line[8], line[9], line[10]};
@@ -44,13 +57,19 @@ class CANresponse {
             messageId.swap(newMessageId);
 
         }
-
+        /*
+         * @brief Defines the payloadSize propriety of the CANresponse class
+         * @param Actual reading line
+         */
         void get_payload(std::string line) {
 
             payloadSize = line[15] -'0';    
 
         }
-
+        /*
+         * @brief Defines the bytes propriety of the CANresponse class
+         * @param Actual reading line
+         */
         void get_bytes(std::string line) {
 
             auto it = line.begin() + 19;
@@ -74,7 +93,13 @@ class Sensor {
 
         CANresponse data;
 
-        float fromHEXtofloat(std::string HEXvalue) {
+        /*
+         * @brief Converts a 4-bytes floating point in hexadecimal format into a 
+         * 4-bytes floating point in decimal format
+         * @param 4-bytes floating point in hexadecimal format
+         * @return 4-bytes floating point in decimal format
+         */
+        static float fromHEXtofloat(const std::string HEXvalue) {
 
             ulf u;
             std::stringstream buffer(HEXvalue);
@@ -101,6 +126,9 @@ class Sensor {
 
         }
 
+        /*
+         * @brief Redirects the information to the specific function
+         */
         void buffer() {
 
             if (data.payloadSize != 0 && data.messageId[0] == '7' && data.messageId[1] == 'F') {
@@ -138,6 +166,12 @@ class Sensor {
             }
         }
 
+        /*
+         * @brief Read SG Data => A packet with the opcode set to b0000, which
+         * contains the two byte status code, followed by the two byte values 
+         * for sg0, sg2, and sg4
+         * @param 8-bytes vector in hexadecimal format
+         */
         void read_0x0(std::vector<std::string> bytes) {
 
             SG[0] = std::stoi("0x" + bytes[2] + bytes[3], nullptr, 16);
@@ -146,6 +180,11 @@ class Sensor {
 
         }
 
+        /*
+         * @brief Read SG Data => A packet with the opcode b0001, which contains
+         * the three 2-byte values sg1, sg3, and sg5
+         * @param 6-bytes vector in hexadecimal format
+         */
         void read_0x1(std::vector<std::string> bytes) {
 
             SG[1] = std::stoi("0x" + bytes[0] + bytes[1], nullptr, 16);
@@ -154,6 +193,11 @@ class Sensor {
 
         }
 
+        /*
+         * @brief Defines the actual reading axis in a 1-byte package
+         * or defines the SG0 and SG1 matrix coefficients
+         * @param 1-byte vector in hexadecimal format or 8-bytes vector
+         */
         void read_0x2(std::vector<std::string> bytes) {
 
             if (bytes.size() == READ_AXIS_PACKAGE_SIZE) {
@@ -181,6 +225,10 @@ class Sensor {
 
         }
 
+        /*
+         * @brief Defines the SG2 and SG3 matrix coefficients
+         * @param 8-bytes vector in hexadecimal format
+         */
         void read_0x3(std::vector<std::string> bytes) {
 
             float sg2 = fromHEXtofloat("0x" + bytes[0] + bytes[1] + bytes[2] + bytes[3]); 
@@ -200,6 +248,10 @@ class Sensor {
 
         }
 
+        /*
+         * @brief Defines the SG4 and SG5 matrix coefficients
+         * @param 8-bytes vector in hexadecimal format
+         */
         void read_0x4(std::vector<std::string> bytes) {
 
             float sg4 = fromHEXtofloat("0x" + bytes[0] + bytes[1] + bytes[2] + bytes[3]); 
@@ -228,7 +280,13 @@ class Sensor {
             }
 
         }
-
+        
+        /*
+         * @brief Defines counts per force (CpF) and counts per torque (CpT) 
+         * The first 4 bytes are the counts per force, followed by the 4 byte
+         * counts per torque.
+         * @param 8-bytes vector in hexadecimal format
+         */
         void read_0x7(std::vector<std::string> bytes) {
 
             CpF = std::stoi("0x" + bytes[0] + bytes[1] + bytes[2] + bytes[3], nullptr, 16);
@@ -236,6 +294,10 @@ class Sensor {
 
         }
 
+        /*
+         * @brief Defines the force unit and the torque unit
+         * @param 2-bytes vector in hexadecimal format
+         */
         void readUnit_0x8(std::vector<std::string> bytes) {
 
             std::string forceUnitCode[6]{"lbf", "N", "Klbf", "kN", "kgf", "gf"};
@@ -246,6 +308,10 @@ class Sensor {
 
         }
 
+        /*
+         * @brief Multiply the calibration matrix for the SG vector, resulting in the
+         * final answer
+         */
         void resultAnswer() {
 
             float resultAnswer[6];
@@ -283,6 +349,8 @@ int main () {
 
     } else {
 
+        // Reads each line of the file and makes the respective operation
+        
 		for (std::array<char, 43> line; file.getline(&line[0], 43, '\n'); ) {
 
             sensor.setCANresponse(&line[0]);
