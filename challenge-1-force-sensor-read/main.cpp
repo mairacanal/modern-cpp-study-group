@@ -9,7 +9,7 @@ Engineering of São Carlos - University of São Paulo - Brazil
 * @date Jan 2021
 * @version 0.1
 
-********************************************************************/
+*********************************************************************/
 
 #include <iostream>
 #include <fstream>
@@ -19,6 +19,7 @@ Engineering of São Carlos - University of São Paulo - Brazil
 
 #define READ_AXIS_PACKAGE_SIZE 1
 #define CALIBRATION_MATRIX_SIZE 6
+#define SENSOR_LOG_LINE_SIZE 43
 
 /* Data structure defined to convert 4-bytes floating point 
 in hexadecimal format to a 4-bytes floating point in decimal
@@ -211,13 +212,13 @@ class Sensor {
 
                 if (actualReadingAxis == 0 || actualReadingAxis == 1 || actualReadingAxis == 2 ) {
 
-                    calibrationMatrix[actualReadingAxis][0] = sg0 * CpF;
-                    calibrationMatrix[actualReadingAxis][1] = sg1 * CpF;
+                    calibrationMatrix[actualReadingAxis][0] = sg0/CpF;
+                    calibrationMatrix[actualReadingAxis][1] = sg1/CpF;
 
                 } else {
 
-                    calibrationMatrix[actualReadingAxis][0] = sg0 * CpT;
-                    calibrationMatrix[actualReadingAxis][1] = sg1 * CpT;
+                    calibrationMatrix[actualReadingAxis][0] = sg0/CpT;
+                    calibrationMatrix[actualReadingAxis][1] = sg1/CpT;
 
                 }
 
@@ -236,13 +237,13 @@ class Sensor {
 
             if (actualReadingAxis == 0 || actualReadingAxis == 1 || actualReadingAxis == 2 ) {
 
-                calibrationMatrix[actualReadingAxis][2] = sg2 * CpF;
-                calibrationMatrix[actualReadingAxis][3] = sg3 * CpF;
+                calibrationMatrix[actualReadingAxis][2] = sg2/CpF;
+                calibrationMatrix[actualReadingAxis][3] = sg3/CpF;
 
             } else {
 
-                calibrationMatrix[actualReadingAxis][2] = sg2 * CpT;
-                calibrationMatrix[actualReadingAxis][3] = sg3 * CpT;
+                calibrationMatrix[actualReadingAxis][2] = sg2/CpT;
+                calibrationMatrix[actualReadingAxis][3] = sg3/CpT;
 
             }
 
@@ -259,13 +260,13 @@ class Sensor {
 
             if (actualReadingAxis == 0 || actualReadingAxis == 1 || actualReadingAxis == 2 ) {
 
-                calibrationMatrix[actualReadingAxis][4] = sg4 * CpF;
-                calibrationMatrix[actualReadingAxis][5] = sg5 * CpF;
+                calibrationMatrix[actualReadingAxis][4] = sg4/CpF;
+                calibrationMatrix[actualReadingAxis][5] = sg5/CpF;
 
             } else {
 
-                calibrationMatrix[actualReadingAxis][4] = sg4 * CpT;
-                calibrationMatrix[actualReadingAxis][5] = sg5 * CpT;
+                calibrationMatrix[actualReadingAxis][4] = sg4/CpT;
+                calibrationMatrix[actualReadingAxis][5] = sg5/CpT;
 
             }
 
@@ -319,14 +320,16 @@ class Sensor {
 
             for (int i = 0; i < CALIBRATION_MATRIX_SIZE; i++) {
 
+                resultAnswer[i] = 0;
+
                 for (int j = 0; j < CALIBRATION_MATRIX_SIZE; j++) {
                 
-                    resultAnswer[i] +=  calibrationMatrix[i][j] * SG[j]; 
+                    resultAnswer[i] +=  calibrationMatrix[i][5 - j] * SG[j]; 
 
                 }
 
-                if (i < 3) std::cout << label[i] << ": " << resultAnswer[i]/CpF << " " << forceUnit << " ";
-                else std::cout << label[i] << ": " << resultAnswer[i]/CpT << " " << torqueUnit << " ";
+                if (i < 3) std::cout << label[i] << ": " << resultAnswer[i] << " " << forceUnit << " ";
+                else std::cout << label[i] << ": " << resultAnswer[i] << " " << torqueUnit << " ";
 
             }
 
@@ -350,8 +353,8 @@ int main () {
     } else {
 
         // Reads each line of the file and makes the respective operation
-        
-		for (std::array<char, 43> line; file.getline(&line[0], 43, '\n'); ) {
+
+		for (std::array<char, SENSOR_LOG_LINE_SIZE> line; file.getline(&line[0], SENSOR_LOG_LINE_SIZE, '\n'); ) {
 
             sensor.setCANresponse(&line[0]);
             sensor.buffer();
