@@ -16,6 +16,7 @@ Engineering of São Carlos - University of São Paulo - Brazil
 #include <sstream>
 #include <vector>
 #include <array>
+#include "../force_torque_to_file.h" 
 
 #define READ_AXIS_PACKAGE_SIZE 1
 #define CALIBRATION_MATRIX_SIZE 6
@@ -27,6 +28,15 @@ format*/
 union ulf {
     unsigned long ul;
     float f;
+};
+
+enum Axis {
+    Fx,
+    Fy,
+    Fz,
+    Tx,
+    Ty,
+    Tz
 };
 
 class CANresponse {
@@ -118,8 +128,10 @@ class Sensor {
         std::string forceUnit;
         std::string torqueUnit;
         int actualReadingAxis;
-        int SG[CALIBRATION_MATRIX_SIZE];
-        float calibrationMatrix[CALIBRATION_MATRIX_SIZE][CALIBRATION_MATRIX_SIZE];
+        std::array<int,CALIBRATION_MATRIX_SIZE> SG;
+        std::array<std::array<float, CALIBRATION_MATRIX_SIZE>, CALIBRATION_MATRIX_SIZE> calibrationMatrix;
+        std::vector<std::array<float, 3>> force{};
+        std::vector<std::array<float, 3>> torque{};
 
         void setCANresponse(std::string line) {
 
@@ -210,7 +222,7 @@ class Sensor {
                 float sg0 = fromHEXtofloat("0x" + bytes[0] + bytes[1] + bytes[2] + bytes[3]);
                 float sg1 = fromHEXtofloat("0x" + bytes[4] + bytes[5] + bytes[6] + bytes[7]);
 
-                if (actualReadingAxis == 0 || actualReadingAxis == 1 || actualReadingAxis == 2 ) {
+                if (actualReadingAxis == Axis::Fx || actualReadingAxis == Axis::Fy || actualReadingAxis == Axis::Fz) {
 
                     calibrationMatrix[actualReadingAxis][0] = sg0/CpF;
                     calibrationMatrix[actualReadingAxis][1] = sg1/CpF;
@@ -235,7 +247,7 @@ class Sensor {
             float sg2 = fromHEXtofloat("0x" + bytes[0] + bytes[1] + bytes[2] + bytes[3]); 
             float sg3 = fromHEXtofloat("0x" + bytes[4] + bytes[5] + bytes[6] + bytes[7]);
 
-            if (actualReadingAxis == 0 || actualReadingAxis == 1 || actualReadingAxis == 2 ) {
+            if (actualReadingAxis == Axis::Fx || actualReadingAxis == Axis::Fy || actualReadingAxis == Axis::Fz) {
 
                 calibrationMatrix[actualReadingAxis][2] = sg2/CpF;
                 calibrationMatrix[actualReadingAxis][3] = sg3/CpF;
@@ -258,7 +270,7 @@ class Sensor {
             float sg4 = fromHEXtofloat("0x" + bytes[0] + bytes[1] + bytes[2] + bytes[3]); 
             float sg5 = fromHEXtofloat("0x" + bytes[4] + bytes[5] + bytes[6] + bytes[7]);
 
-            if (actualReadingAxis == 0 || actualReadingAxis == 1 || actualReadingAxis == 2 ) {
+            if (actualReadingAxis == Axis::Fx || actualReadingAxis == Axis::Fy || actualReadingAxis == Axis::Fz) {
 
                 calibrationMatrix[actualReadingAxis][4] = sg4/CpF;
                 calibrationMatrix[actualReadingAxis][5] = sg5/CpF;
@@ -301,8 +313,8 @@ class Sensor {
          */
         void readUnit_0x8(std::vector<std::string> bytes) {
 
-            std::string forceUnitCode[6]{"lbf", "N", "Klbf", "kN", "kgf", "gf"};
-            std::string torqueUnitCode[6]{"lbf-in", "lbf-ft", "N-m", "N-mm", "kgf-cm", "kN-m"};
+            std::array<std::string, 6> forceUnitCode{"lbf", "N", "Klbf", "kN", "kgf", "gf"};
+            std::array<std::string, 6> torqueUnitCode{"lbf-in", "lbf-ft", "N-m", "N-mm", "kgf-cm", "kN-m"};
 
             forceUnit = forceUnitCode[std::stoi("0x" + bytes[0], nullptr, 16) - 1];
             torqueUnit = torqueUnitCode[std::stoi("0x" + bytes[1], nullptr, 16) -1 ];
@@ -315,25 +327,19 @@ class Sensor {
          */
         void resultAnswer() {
 
-            float resultAnswer[6];
-            std::string label[6]{"Fx", "Fy", "Fz", "Tx", "Ty", "Tz"};
+            force.emplace_back(std::array<float,3> {0,0,0});
+            torque.emplace_back(std::array<float,3> {0,0,0});
 
             for (int i = 0; i < CALIBRATION_MATRIX_SIZE; i++) {
 
-                resultAnswer[i] = 0;
-
                 for (int j = 0; j < CALIBRATION_MATRIX_SIZE; j++) {
-                
-                    resultAnswer[i] +=  calibrationMatrix[i][5 - j] * SG[j]; 
+
+                    if (i < 3) force[force.size() - 1][i] += calibrationMatrix[i][5 - j] * SG[j];
+                    else torque[torque.size() - 1][i - 3] += calibrationMatrix[i][5 - j] * SG[j];
 
                 }
 
-                if (i < 3) std::cout << label[i] << ": " << resultAnswer[i] << " " << forceUnit << " ";
-                else std::cout << label[i] << ": " << resultAnswer[i] << " " << torqueUnit << " ";
-
             }
-
-            std::cout << std::endl;
 
         }
 
@@ -362,6 +368,7 @@ int main () {
         }
 
         file.close();
+        to_file::forceTorqueToFile(sensor.calibrationMatrix, sensor.force, sensor.torque);
 
     }
 
